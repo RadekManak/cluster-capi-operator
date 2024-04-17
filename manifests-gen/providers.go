@@ -102,43 +102,92 @@ func (p *provider) writeProviderComponentsToManifest(fileName string, objs []uns
 	return os.WriteFile(path.Join(*manifestsPath, fileName), ensureNewLine(combined), 0600)
 }
 
+//// FromUnstructured takes a list of Unstructured objects and converts it into a YAML.
+//func FromUnstructured(objs []unstructured.Unstructured) ([]byte, error) {
+//	var ret [][]byte //nolint:prealloc
+//	for _, o := range objs {
+//		content, err := yaml.Marshal(o.UnstructuredContent())
+//		if err != nil {
+//			return nil, errors.Wrapf(err, "failed to marshal yaml for %s, %s/%s", o.GroupVersionKind(), o.GetNamespace(), o.GetName())
+//		}
+//		ret = append(ret, content)
+//	}
+//
+//	return JoinYaml(ret...), nil
+//}
+
 // writeProviderComponentsConfigmap allows to write provider components to the provider (transport) ConfigMap.
 func (p *provider) writeProviderComponentsConfigmap(fileName string, objs []unstructured.Unstructured) error {
-	combined, err := utilyaml.FromUnstructured(objs)
-	if err != nil {
-		return fmt.Errorf("error converting unstructure object to YAML: %w", err)
+	CONFIGMAP_SIZE_LIMIT := 1_000_000
+	components_buckets := [][]byte{}
+	components := [][]byte{}
+
+	size := 0
+	for _, obj := range objs {
+		content, err := yaml.Marshal(obj.UnstructuredContent())
+		if err != nil {
+			return err
+		}
+		if size+len(content) < CONFIGMAP_SIZE_LIMIT {
+			size += len(content)
+			components = append(components, content)
+		} else {
+			components_buckets = append(components_buckets, utilyaml.JoinYaml(components...))
+			components = [][]byte{}
+			size = 0
+		}
+	}
+
+	if len(components) != 0 {
+		components_buckets = append(components_buckets, utilyaml.JoinYaml(components...))
 	}
 
 	annotations := openshiftAnnotations
 	annotations[featureSetAnnotationKey] = featureSetAnnotationValue
 
-	cm := &corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ConfigMap",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      p.Name,
-			Namespace: targetNamespace,
-			Labels: map[string]string{
-				"provider.cluster.x-k8s.io/name":    p.Name,
-				"provider.cluster.x-k8s.io/type":    p.providerTypeName(),
-				"provider.cluster.x-k8s.io/version": p.Version,
+	isSharded := len(components_buckets) > 1
+	for index, components := range components_buckets {
+		suffix := ""
+		if isSharded {
+			suffix = fmt.Sprintf("-%d", index+1)
+		}
+		cm := &corev1.ConfigMap{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "ConfigMap",
+				APIVersion: "v1",
 			},
-			Annotations: annotations,
-		},
-		Data: map[string]string{
-			"metadata":   string(p.metadata),
-			"components": string(combined),
-		},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      p.Name + suffix,
+				Namespace: targetNamespace,
+				Labels: map[string]string{
+					"provider.cluster.x-k8s.io/name":    p.Name,
+					"provider.cluster.x-k8s.io/type":    p.providerTypeName(),
+					"provider.cluster.x-k8s.io/version": p.Version,
+				},
+				Annotations: annotations,
+			},
+			Data: map[string]string{
+				"metadata":   string(p.metadata),
+				"components": string(components),
+			},
+		}
+		cmYaml, err := yaml.Marshal(cm)
+		if err != nil {
+			return fmt.Errorf("error marshaling provider ConfigMap to YAML: %w", err)
+		}
+
+		cut, found := strings.CutSuffix(fileName, ".yaml")
+		if !found {
+			return fmt.Errorf("output filename %s does not have .yaml suffix", fileName)
+		}
+		shardedFilename := cut + suffix + ".yaml"
+		err = os.WriteFile(path.Join(*manifestsPath, shardedFilename), ensureNewLine(cmYaml), 0600)
+		if err != nil {
+			return fmt.Errorf("Error writing configmap: %w", err)
+		}
 	}
 
-	cmYaml, err := yaml.Marshal(cm)
-	if err != nil {
-		return fmt.Errorf("error marshaling provider ConfigMap to YAML: %w", err)
-	}
-
-	return os.WriteFile(path.Join(*manifestsPath, fileName), ensureNewLine(cmYaml), 0600)
+	return nil
 }
 
 func importProvider(p provider) error {
