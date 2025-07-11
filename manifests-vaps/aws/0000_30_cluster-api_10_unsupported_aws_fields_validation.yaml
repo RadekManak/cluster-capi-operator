@@ -1,0 +1,56 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: "unsupported-aws-fields"
+spec:
+  policyName: "unsupported-aws-fields"
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        name: openshift-cluster-api
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: "unsupported-aws-fields"
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:   ["infrastructure.cluster.x-k8s.io"]
+      apiVersions: ["v1beta2"]
+      operations:  ["CREATE", "UPDATE"]
+      resources:   ["awsmachines", "awsmachinetemplates"]
+  variables:
+    - name: machineSpec
+      expression: "object.kind == 'AWSMachine' ? object.spec : object.spec.template.spec"
+  validations:
+    - expression: "!has(variables.machineSpec.ami.eksLookupType)"
+      message: "spec.ami.eksOptimizedLookupType is a forbidden field"
+    - expression: "!has(variables.machineSpec.imageLookupFormat) || variables.machineSpec.imageLookupFormat == ''"
+      message: "spec.imageLookupFormat is a forbidden field"
+    - expression: "!has(variables.machineSpec.imageLookupOrg) || variables.machineSpec.imageLookupOrg == ''"
+      message: "spec.imageLookupOrg is a forbidden field"
+    - expression: "!has(variables.machineSpec.imageLookupBaseOS) || variables.machineSpec.imageLookupBaseOS == ''"
+      message: "spec.imageLookupBaseOS is a forbidden field"
+    - expression: "!has(variables.machineSpec.networkInterfaces) || size(variables.machineSpec.networkInterfaces) == 0"
+      message: "spec.networkInterfaces is a forbidden field"
+    - expression: "!has(variables.machineSpec.uncompressedUserData)"
+      message: "spec.uncompressedUserData is a forbidden field"
+    - expression: "!has(variables.machineSpec.privateDnsName)"
+      message: "spec.privateDnsName is a forbidden field"
+    - expression: "!has(variables.machineSpec.ignition) || !has(variables.machineSpec.ignition.proxy)"
+      message: "spec.ignition.proxy is a forbidden field"
+    - expression: "!has(variables.machineSpec.ignition) || !has(variables.machineSpec.ignition.tls)"
+      message: "spec.ignition.tls is a forbidden field"
+    - expression: "!has(variables.machineSpec.securityGroupOverrides) || size(variables.machineSpec.securityGroupOverrides) == 0"
+      message: "spec.securityGroupOverrides is a forbidden field"
+    - expression: >-
+        !has(variables.machineSpec.cloudInit) || 
+        ((!has(variables.machineSpec.cloudInit.secretCount) || variables.machineSpec.cloudInit.secretCount == 0) &&
+         (!has(variables.machineSpec.cloudInit.secretPrefix) || variables.machineSpec.cloudInit.secretPrefix == '') &&
+         (!has(variables.machineSpec.cloudInit.insecureSkipSecretsManager) || variables.machineSpec.cloudInit.insecureSkipSecretsManager == false) &&
+         (!has(variables.machineSpec.cloudInit.secureSecretsBackend) || variables.machineSpec.cloudInit.secureSecretsBackend == ''))
+      message: "spec.cloudInit is a forbidden field"
