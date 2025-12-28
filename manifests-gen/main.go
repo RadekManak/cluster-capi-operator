@@ -48,8 +48,7 @@ func main() {
 	projDir = path.Join(*basePath)
 
 	p := provider{
-		Name: *providerName,
-		// TODO: improve validation
+		Name:    *providerName,
 		Type:    clusterctlv1.ProviderType(*providerType),
 		Version: *providerVersion,
 	}
@@ -67,6 +66,18 @@ func validateFlags() error {
 
 	if _, err := version.ParseSemantic(*providerVersion); err != nil {
 		return fmt.Errorf("invalid version %s for provider %s", *providerVersion, *providerName)
+	}
+
+	switch clusterctlv1.ProviderType(*providerType) {
+	case clusterctlv1.CoreProviderType,
+		clusterctlv1.BootstrapProviderType,
+		clusterctlv1.ControlPlaneProviderType,
+		clusterctlv1.InfrastructureProviderType,
+		clusterctlv1.IPAMProviderType,
+		clusterctlv1.RuntimeExtensionProviderType,
+		clusterctlv1.AddonProviderType:
+	default:
+		return fmt.Errorf("invalid provider type %q", *providerType)
 	}
 
 	return nil
