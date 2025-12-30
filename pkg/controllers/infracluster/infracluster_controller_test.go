@@ -34,9 +34,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+
+	metal3v1 "github.com/metal3-io/cluster-api-provider-metal3/api/v1beta1"
 	awsv1 "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
+	azurev1 "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
+	gcpv1 "sigs.k8s.io/cluster-api-provider-gcp/api/v1beta1"
+	ibmpowervsv1 "sigs.k8s.io/cluster-api-provider-ibmcloud/api/v1beta2"
+	openstackv1 "sigs.k8s.io/cluster-api-provider-openstack/api/v1beta1"
+	vspherev1 "sigs.k8s.io/cluster-api-provider-vsphere/apis/v1beta1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -324,7 +332,7 @@ func startManager(mgrCtx context.Context, mgrDone chan struct{}, ocpInfra *confi
 	}
 
 	// TODO: set watch to the right Infra Cluster in setupwithmanager
-	Expect(r.SetupWithManager(mgr, &awsv1.AWSCluster{})).To(Succeed(), "Reconciler should be able to setup with manager")
+	Expect(r.SetupWithManager(mgr, getWatchedObject(ocpInfra.Status.PlatformStatus.Type))).To(Succeed(), "Reconciler should be able to setup with manager")
 
 	By("Starting the manager", func() {
 		go func() {
@@ -341,4 +349,25 @@ func stopManager(mgrCancel context.CancelFunc, mgrDone chan struct{}) {
 	mgrCancel()
 	// Wait for the mgrDone to be closed, which will happen once the mgr has stopped
 	<-mgrDone
+}
+
+func getWatchedObject(platform configv1.PlatformType) client.Object {
+	switch platform {
+	case configv1.AWSPlatformType:
+		return &awsv1.AWSCluster{}
+	case configv1.GCPPlatformType:
+		return &gcpv1.GCPCluster{}
+	case configv1.AzurePlatformType:
+		return &azurev1.AzureCluster{}
+	case configv1.PowerVSPlatformType:
+		return &ibmpowervsv1.IBMPowerVSCluster{}
+	case configv1.VSpherePlatformType:
+		return &vspherev1.VSphereCluster{}
+	case configv1.BareMetalPlatformType:
+		return &metal3v1.Metal3Cluster{}
+	case configv1.OpenStackPlatformType:
+		return &openstackv1.OpenStackCluster{}
+	default:
+		return nil
+	}
 }
