@@ -37,7 +37,7 @@ bin/:
 
 .PHONY: manifests-gen
 manifests-gen: | bin/ ## Build manifests-gen binary
-	cd manifests-gen && go build -o ../bin/manifests-gen && cd ..
+	go build -o bin/manifests-gen ./manifests-gen
 
 bin/%: | bin/ FORCE
 	go build -o "$@" "./cmd/$*"
