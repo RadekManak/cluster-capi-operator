@@ -81,7 +81,6 @@ func StartEnvTest(testEnv *envtest.Environment) (*rest.Config, client.Client, er
 	}
 
 	testEnv.CRDDirectoryPaths = []string{
-		path.Join(openshiftAPIPath, "config", "v1", "zz_generated.crd-manifests"),
 		path.Join(openshiftAPIPath, "operator", "v1", "zz_generated.crd-manifests", "0000_10_config-operator_01_configs.crd.yaml"),
 	}
 	testEnv.ErrorIfCRDPathMissing = true
@@ -91,6 +90,8 @@ func StartEnvTest(testEnv *envtest.Environment) (*rest.Config, client.Client, er
 			path.Join(openshiftAPIPath, "machine", "v1beta1", "zz_generated.crd-manifests", "0000_10_machine-api_01_machinesets-CustomNoUpgrade.crd.yaml"),
 			path.Join(openshiftAPIPath, "machine", "v1beta1", "zz_generated.crd-manifests", "0000_10_machine-api_01_machines-CustomNoUpgrade.crd.yaml"),
 			path.Join(openshiftAPIPath, "config", "v1", "zz_generated.crd-manifests", "0000_00_cluster-version-operator_01_clusteroperators.crd.yaml"),
+			path.Join(openshiftAPIPath, "config", "v1", "zz_generated.crd-manifests", "0000_00_cluster-version-operator_01_clusterversions-TechPreviewNoUpgrade.crd.yaml"),
+			path.Join(openshiftAPIPath, "config", "v1", "zz_generated.crd-manifests", "0000_10_config-operator_01_infrastructures-TechPreviewNoUpgrade.crd.yaml"),
 		},
 		ErrorIfPathMissing: true,
 	}
