@@ -21,3 +21,6 @@ bin/
 /.localtestenv
 .claude/*.local.*
 .claude/worktrees/
+# Autoresearch artifacts
+hack/autoresearch/test-output.log
+hack/autoresearch/results.tsv
